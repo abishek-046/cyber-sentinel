@@ -1,13 +1,38 @@
 """
 Cybersecurity Sentinel - Global Configuration
+Supports both local execution and cloud deployment (Streamlit Cloud).
+On cloud, writable artefacts go to /tmp to avoid read-only filesystem errors.
 """
 import os
+import tempfile
 
 # Base paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-MODELS_DIR = os.path.join(BASE_DIR, "models")
-DATABASE_DIR = os.path.join(BASE_DIR, "database")
+
+# Detect cloud / read-only filesystem: use /tmp for writable artefacts
+# when the repo root is not writable (Streamlit Cloud mounts it read-only).
+def _writable(path: str) -> bool:
+    try:
+        os.makedirs(path, exist_ok=True)
+        test = os.path.join(path, ".write_test")
+        with open(test, "w") as f:
+            f.write("x")
+        os.remove(test)
+        return True
+    except OSError:
+        return False
+
+_default_models = os.path.join(BASE_DIR, "models")
+_default_db_dir = os.path.join(BASE_DIR, "database")
+
+if _writable(_default_models):
+    MODELS_DIR = _default_models
+    DATABASE_DIR = _default_db_dir
+else:
+    # Cloud: use /tmp
+    MODELS_DIR = os.path.join(tempfile.gettempdir(), "sentinel_models")
+    DATABASE_DIR = os.path.join(tempfile.gettempdir(), "sentinel_db")
 
 # Ensure directories exist
 for _d in [DATA_DIR, MODELS_DIR, DATABASE_DIR]:
